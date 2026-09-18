@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+:root {
+  --bg-app: #FAF8F5;
+  --bg-sidebar: #FFFFFF;
+  --surface-primary: #FFFFFF;
+  --surface-secondary: #FAFAF9;
+  --surface-elevated: #FFFFFF;
+  
+  --border-subtle: #F3E8E8;
+  --border-medium: #E2E8F0;
+  --border-focus: #BE185D;
+  
+  --text-primary: #0F172A;
+  --text-secondary: #475569;
+  --text-muted: #64748B;
+  --text-subtle: #94A3B8;
+  
+  --accent-primary: #BE185D;
+  --accent-primary-hover: #996274;
+  --accent-blush: #FDF2F8;
+  --accent-blush-border: #FCE7F3;
+  --accent-ai: #BE185D;
+  
+  --severity-critical: #E11D48;
+  --severity-threat: #BE185D;
+  --severity-warning: #D97706;
+  --severity-success: #059669;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background-color: #FAF8F5;
+  color: #0F172A;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-heading {
+  font-family: 'Manrope', 'DM Sans', 'Inter', -apple-system, sans-serif;
+  letter-spacing: -0.025em;
+}
+
+.font-montserrat {
+  font-family: 'Montserrat', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+code, pre, kbd, .font-mono {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Elegant Cream & Slate Precision Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #FAF8F5;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E2E8F0;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #CBD5E1;
+}
+
+/* Soft, gentle pulse for system heartbeat */
+@keyframes calm-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.96); }
+}
+
+.animate-calm-pulse {
+  animation: calm-pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* SPECTRUM Smooth Border Light Beam Sweep */
+@keyframes spectrumBorderSweep {
+  0% {
+    transform: translate(-50%, -50%) rotate(0deg);
+  }
+  100% {
+    transform: translate(-50%, -50%) rotate(360deg);
+  }
+}
+
+.animate-border-sweep {
+  animation: spectrumBorderSweep 4.2s linear infinite;
+  will-change: transform;
+}
+
+.group:hover .animate-border-sweep {
+  animation-duration: 2.8s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-border-sweep {
+    animation: none !important;
+  }
+}

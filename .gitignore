@@ -1,0 +1,72 @@
+# Dependencies
+node_modules/
+package-lock.json.bak
+jspm_packages/
+.pnp
+.pnp.js
+
+# Build artifacts and bundles
+dist/
+dist-ssr/
+build/
+*.whl
+
+# Environment variables & secrets
+.env
+.env.*
+!.env.example
+
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Python cache & bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Databases & local persistent state
+*.db
+*.sqlite
+*.sqlite3
+backend/*.db
+backend/*.sqlite
+backend/*.sqlite3
+
+# Generated runtime reports & uploads
+backend/data/reports/*.pdf
+backend/data/uploads/*
+!backend/data/reports/.gitkeep
+!backend/data/uploads/.gitkeep
+
+# Operating system files
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Editor & IDE directories
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
