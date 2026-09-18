@@ -57,6 +57,7 @@ $RECYCLE.BIN/
 # Editor & IDE directories
 .vscode/
 .idea/
+push_to_github.bat
 *.suo
 *.ntvs*
 *.njsproj
