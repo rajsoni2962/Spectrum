@@ -2,6 +2,9 @@ const API_BASE = "/api/v1";
 
 export async function fetchDashboardSummary() {
   const res = await fetch(`${API_BASE}/dashboard/summary`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch dashboard summary: HTTP ${res.status}`);
+  }
   return res.json();
 }
 

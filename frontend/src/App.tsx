@@ -201,20 +201,28 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     // Initial status fetch
-    fetchSimulationStatus().then((res) => {
-      if (res.mode) setTelemetryMode(res.mode);
-      if (res.active_scenario) setActiveScenario(res.active_scenario);
-      if (res.forecast) {
-        setThreatState(res.forecast.current_threat_state || "Normal");
-        setRiskScore(res.forecast.overall_risk_score || 7.4);
-      }
-    });
+    fetchSimulationStatus()
+      .then((res) => {
+        if (res && res.mode) setTelemetryMode(res.mode);
+        if (res && res.active_scenario) setActiveScenario(res.active_scenario);
+        if (res && res.forecast) {
+          setThreatState(res.forecast.current_threat_state || "Normal");
+          setRiskScore(res.forecast.overall_risk_score || 7.4);
+        }
+      })
+      .catch(() => {
+        // Backend offline: keep initial default state
+      });
 
-    fetchAlerts().then((res) => {
-      if (Array.isArray(res)) {
-        setOpenAlertsCount(res.filter((a) => a.status === "Open" || a.status === "NEW").length);
-      }
-    });
+    fetchAlerts()
+      .then((res) => {
+        if (Array.isArray(res)) {
+          setOpenAlertsCount(res.filter((a) => a.status === "Open" || a.status === "NEW").length);
+        }
+      })
+      .catch(() => {
+        // Backend offline: keep initial default count
+      });
 
     // Subscribe to live WebSocket events
     const unsubscribe = socWebSocket.subscribe((msg) => {

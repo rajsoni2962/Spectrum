@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   ShieldAlert,
   ShieldCheck,
@@ -17,6 +17,8 @@ import {
   Binary,
   Layers,
   Cpu,
+  RefreshCw,
+  WifiOff,
 } from "lucide-react";
 import { fetchDashboardSummary } from "../services/api";
 import { RadialPercentageGauge } from "../components/RadialPercentageGauge";
@@ -31,32 +33,151 @@ interface DashboardProps {
   navigateWithPivot?: (page: string, params?: any) => void;
 }
 
+// Complete, realistic fallback telemetry dataset used in offline simulation mode
+const DEFAULT_DASHBOARD_DATA = {
+  kpis: {
+    network_health_percent: 94.2,
+    current_threat_level: "Normal",
+    overall_attack_risk: 7.4,
+    active_incidents: 1,
+    events_per_minute: 8400,
+    model_confidence: 96.4,
+    forecast_horizon_seconds: 300,
+    predicted_attack: "Normal",
+    is_simulated: true,
+  },
+  attack_risk_timeline: [
+    { time: "T-14m", risk_score: 5.0, anomaly_score: 0.05 },
+    { time: "T-12m", risk_score: 5.4, anomaly_score: 0.05 },
+    { time: "T-10m", risk_score: 5.9, anomaly_score: 0.06 },
+    { time: "T-8m", risk_score: 6.2, anomaly_score: 0.06 },
+    { time: "T-6m", risk_score: 6.6, anomaly_score: 0.07 },
+    { time: "T-4m", risk_score: 7.0, anomaly_score: 0.07 },
+    { time: "T-2m", risk_score: 7.2, anomaly_score: 0.08 },
+    { time: "Now", risk_score: 7.4, anomaly_score: 0.08 },
+  ],
+  traffic_volume: [
+    { time: "12:00", packets: 96, bandwidth_kb: 108 },
+    { time: "12:10", packets: 102, bandwidth_kb: 114 },
+    { time: "12:20", packets: 108, bandwidth_kb: 120 },
+    { time: "12:30", packets: 114, bandwidth_kb: 126 },
+    { time: "12:40", packets: 120, bandwidth_kb: 43 },
+  ],
+  attack_distribution: [
+    { name: "DDoS", value: 35, color: "#FF2E63" },
+    { name: "Port Scan", value: 25, color: "#FF4D5E" },
+    { name: "Brute Force", value: 18, color: "#FFB547" },
+    { name: "Botnet", value: 12, color: "#4F8CFF" },
+    { name: "Web Attack", value: 10, color: "#A78BFA" },
+  ],
+  top_source_ips: [
+    { ip: "198.51.100.44", country: "RU", traffic_mb: 420.5, packets: 124000, risk: "Critical" },
+    { ip: "185.220.101.5", country: "DE", traffic_mb: 180.2, packets: 45000, risk: "High" },
+    { ip: "45.33.32.156", country: "US", traffic_mb: 95.8, packets: 28000, risk: "Medium" },
+    { ip: "91.240.118.22", country: "NL", traffic_mb: 78.4, packets: 19500, risk: "High" },
+    { ip: "10.0.2.45", country: "Internal", traffic_mb: 34.1, packets: 8200, risk: "Low" },
+  ],
+  top_destination_ips: [
+    { ip: "10.0.1.15", hostname: "web-prod-01.corp", role: "Web Server", traffic_mb: 512.4, status: "Healthy" },
+    { ip: "10.0.1.20", hostname: "db-cluster-primary.corp", role: "Database", traffic_mb: 185.0, status: "Healthy" },
+    { ip: "10.0.1.5", hostname: "dc-auth-01.corp", role: "Domain Controller", traffic_mb: 142.1, status: "Healthy" },
+    { ip: "10.0.1.1", hostname: "gw-perimeter-fw.corp", role: "Edge Gateway", traffic_mb: 840.6, status: "Healthy" },
+  ],
+  protocol_distribution: [
+    { protocol: "TCP", percentage: 78.4, color: "#4F8CFF" },
+    { protocol: "UDP", percentage: 14.2, color: "#36D399" },
+    { protocol: "HTTP/S", percentage: 5.8, color: "#FFB547" },
+    { protocol: "DNS/ICMP", percentage: 1.6, color: "#94A3B8" },
+  ],
+  live_threat_feed: [
+    {
+      id: "evt-1",
+      type: "SYN Flood Anomaly",
+      message: "High-frequency TCP SYN packet burst detected",
+      severity: "CRITICAL",
+      risk_level: "HIGH",
+      source_ip: "198.51.100.44",
+      destination_ip: "10.0.1.15",
+      protocol: "TCP",
+      timestamp: "Just now",
+    },
+    {
+      id: "evt-2",
+      type: "SSH Brute Force",
+      message: "Repeated failed authentication attempts on port 22",
+      severity: "HIGH",
+      risk_level: "MEDIUM",
+      source_ip: "185.220.101.5",
+      destination_ip: "10.0.1.5",
+      protocol: "SSH",
+      timestamp: "1m ago",
+    },
+    {
+      id: "evt-3",
+      type: "Reconnaissance Scan",
+      message: "Rapid multi-port probe targeting DMZ subnet",
+      severity: "HIGH",
+      risk_level: "MEDIUM",
+      source_ip: "91.240.118.22",
+      destination_ip: "10.0.1.0/24",
+      protocol: "TCP",
+      timestamp: "2m ago",
+    },
+    {
+      id: "evt-4",
+      type: "DNS Tunneling Probe",
+      message: "Unusually large TXT record payload query pattern",
+      severity: "MEDIUM",
+      risk_level: "LOW",
+      source_ip: "45.33.32.156",
+      destination_ip: "10.0.1.1",
+      protocol: "DNS",
+      timestamp: "3m ago",
+    },
+  ],
+};
+
 export const Dashboard: React.FC<DashboardProps> = ({ setActivePage, navigateWithPivot }) => {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isOffline, setIsOffline] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isRetrying, setIsRetrying] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string>("");
 
-  useEffect(() => {
-    loadData();
-    const interval = setInterval(loadData, 2500);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async (isManualRetry = false) => {
+    if (isManualRetry) setIsRetrying(true);
     try {
       const res = await fetchDashboardSummary();
-      setData(res);
+      if (res && res.kpis) {
+        setData(res);
+        setIsOffline(false);
+        setErrorMessage(null);
+      } else {
+        throw new Error("Invalid payload format received from backend");
+      }
+    } catch (err: any) {
+      console.warn("FastAPI backend unavailable, operating in offline simulation mode:", err?.message || err);
+      setIsOffline(true);
+      setErrorMessage("FastAPI backend service is offline at 127.0.0.1:8000. Running in high-fidelity offline simulation mode.");
+      setData((prev: any) => prev || DEFAULT_DASHBOARD_DATA);
+    } finally {
       setLoading(false);
+      if (isManualRetry) setIsRetrying(false);
       const now = new Date();
       setLastUpdated(
         `${String(now.getUTCHours()).padStart(2, "0")}:${String(
           now.getUTCMinutes()
         ).padStart(2, "0")}:${String(now.getUTCSeconds()).padStart(2, "0")} UTC`
       );
-    } catch (err) {
-      console.error("Dashboard fetch error:", err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadData();
+    const interval = setInterval(() => loadData(false), 2500);
+    return () => clearInterval(interval);
+  }, [loadData]);
 
   const handlePivot = (page: string, params?: any) => {
     if (navigateWithPivot) {
@@ -75,25 +196,59 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActivePage, navigateWit
     );
   }
 
-  const {
-    kpis = {
-      network_health_percent: 94.2,
-      current_threat_level: "Normal",
-      overall_attack_risk: 7.4,
-      active_incidents: 1,
-      events_per_minute: 8400,
-      model_confidence: 96.4,
-      forecast_horizon_seconds: 300,
-      predicted_attack: "Normal",
-      is_simulated: false,
-    },
-    live_threat_feed = [],
-  } = data || {};
+  // Safely extract KPIs with bulletproof defaults preventing any NaN or undefined accesses
+  const kpis = {
+    network_health_percent: data?.kpis?.network_health_percent ?? DEFAULT_DASHBOARD_DATA.kpis.network_health_percent,
+    current_threat_level: data?.kpis?.current_threat_level ?? DEFAULT_DASHBOARD_DATA.kpis.current_threat_level,
+    overall_attack_risk: data?.kpis?.overall_attack_risk ?? DEFAULT_DASHBOARD_DATA.kpis.overall_attack_risk,
+    active_incidents: data?.kpis?.active_incidents ?? DEFAULT_DASHBOARD_DATA.kpis.active_incidents,
+    events_per_minute: data?.kpis?.events_per_minute ?? DEFAULT_DASHBOARD_DATA.kpis.events_per_minute,
+    model_confidence: data?.kpis?.model_confidence ?? DEFAULT_DASHBOARD_DATA.kpis.model_confidence,
+    forecast_horizon_seconds: data?.kpis?.forecast_horizon_seconds ?? DEFAULT_DASHBOARD_DATA.kpis.forecast_horizon_seconds,
+    predicted_attack: data?.kpis?.predicted_attack ?? DEFAULT_DASHBOARD_DATA.kpis.predicted_attack,
+    is_simulated: isOffline || Boolean(data?.kpis?.is_simulated),
+  };
 
+  const live_threat_feed = data?.live_threat_feed || DEFAULT_DASHBOARD_DATA.live_threat_feed;
   const isThreatActive = kpis.overall_attack_risk > 50 || kpis.current_threat_level !== "Normal";
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto select-text font-sans">
+      {/* Offline / Backend Disconnected Simulation Banner */}
+      {isOffline && (
+        <div className="bg-[#FFFBEB] border border-[#FDE68A] text-[#92400E] rounded-xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs animate-in fade-in duration-300">
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#FEF3C7] border border-[#FDE68A] flex items-center justify-center text-[#D97706] shrink-0 mt-0.5 sm:mt-0">
+              <WifiOff className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold font-mono uppercase tracking-wider text-[#92400E]">
+                  DEMO SIMULATION MODE
+                </span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-[#FEF3C7] text-[#B45309] font-medium border border-[#FDE68A]">
+                  Backend Unreachable
+                </span>
+              </div>
+              <p className="text-xs text-[#78350F] mt-0.5 leading-relaxed">
+                FastAPI backend is offline at <code className="bg-[#FEF3C7] px-1 py-0.5 rounded text-[11px] font-mono">127.0.0.1:8000</code>. Dashboard is running using simulated network telemetry.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            <button
+              onClick={() => loadData(true)}
+              disabled={isRetrying}
+              className="px-3 py-1.5 rounded-lg bg-white border border-[#FDE68A] text-xs font-medium text-[#92400E] hover:bg-[#FEF3C7] transition-all flex items-center gap-1.5 cursor-pointer shadow-xs disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRetrying ? "animate-spin text-[#D97706]" : ""}`} />
+              <span>{isRetrying ? "Reconnecting..." : "Retry Connection"}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 1. Command Center Executive Posture Header with Ambient Video Loop */}
       <div className="relative bg-white border border-[#F3E8E8] rounded-2xl overflow-hidden shadow-xs">
         {/* Ambient Looping Telemetry Video Background */}
@@ -166,8 +321,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ setActivePage, navigateWit
               <Clock className="w-3.5 h-3.5 text-[#94A3B8]" />
               <span className="text-[#0F172A] font-medium">{lastUpdated || "LIVE"}</span>
               <span className="text-[#E2E8F0]">|</span>
-              <span className={kpis.is_simulated ? "text-[#B45309]" : "text-[#BE185D] font-semibold"}>
-                {kpis.is_simulated ? "SIMULATION LAB" : "LIVE TAP"}
+              <span className={isOffline ? "text-[#D97706] font-semibold" : kpis.is_simulated ? "text-[#B45309]" : "text-[#BE185D] font-semibold"}>
+                {isOffline ? "OFFLINE SIMULATION" : kpis.is_simulated ? "SIMULATION LAB" : "LIVE TAP"}
               </span>
             </div>
           </div>
